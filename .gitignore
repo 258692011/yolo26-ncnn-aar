@@ -1,0 +1,13 @@
+# 构建产物
+.gradle/
+build/
+.cxx/
+captures/
+
+# 本机环境（SDK 路径等，不入库）
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
