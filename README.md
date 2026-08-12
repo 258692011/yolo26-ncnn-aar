@@ -6,7 +6,7 @@ YOLO26 (Ultralytics) 检测模型的 Android AAR 封装，基于 Tencent ncnn �
 
 | 项目 | 说明 |
 |---|---|
-| 模型 | `yolo26n` (COCO 80 类)，`yolo export format=ncnn` 官方导出，fp16 |
+| 模型 | `yolo26n` (COCO 80 类)，`yolo export model=yolo26n.pt format=ncnn quantize='fp16'` 官方导出 fp16 |
 | 验证 | 与 ultralytics 官方 ncnn 预测逐框对比一致（bus.jpg: bus + 4 persons，坐标/置信度吻合） |
 | ncnn | 20260526 官方预编译 `libncnn.so`（CPU，arm64-v8a / armeabi-v7a / x86_64 / x86） |
 | 后处理 | 图内已含 DFL 解码 + sigmoid，App 侧仅做 letterbox 逆变换 + 类别 NMS |
@@ -55,13 +55,13 @@ yolo.close();
 
 ```bash
 pip install ultralytics ncnn pnnx==20260526   # pnnx 版本被官方钉死（新版有段错误 bug）
-yolo export model=yolo26n.pt format=ncnn      # 产物在 yolo26n_ncnn_model/
-# 将 model.ncnn.param / model.ncnn.bin 放入 yolo26/src/main/assets/ 即可
+yolo export model=yolo26n.pt format=ncnn imgsz=320   # imgsz 可选 320/480/640；产物在 yolo26n_ncnn_model/
+# 将 model.ncnn.param / model.ncnn.bin 放入 App 的 assets 或私有目录（AAR 不内置模型）
 ```
 
 关键约定（C++ 解码依赖）：
-- 导出为**静态 640×640** 输入（`inputshape=[1,3,640,640]`），letterbox 必须精确补到 640×640
-- 单输出 `out0`，形状 `w=8400(锚点) × h=84(通道)`，通道 0-3 为已解码 xywh（640 坐标系），4.. 为已 sigmoid 类别分数
+- 导出为**静态 N×N 输入**（`inputshape=[1,3,N,N]`），letterbox 必须精确补到 N×N（N 由 param 自动识别，`inputSize=0` 即可）
+- 单输出 `out0`，形状 `w=锚点数 × h=4+nc(通道)`（640 导出锚点 8400、320 导出 2100），通道 0-3 为已解码 xywh（N 坐标系），4.. 为已 sigmoid 类别分数
 - 换不同类别数 nc 的模型：输出通道变为 4+nc，代码自动适配（`decode_decoded`）；若 nc 使得通道数 >100 会误判为 DFL 原始模式，需调整 `decode_output` 中阈值
 
 ## 构建 AAR（本机已配置好，一键）
@@ -76,9 +76,8 @@ gradle :yolo26:assembleRelease          # 或 ./gradlew :yolo26:assembleRelease
 
 ```
 yolo26/
-├── build.gradle.kts            # com.android.library, abiFilters: arm64-v8a/armeabi-v7a/x86_64
+├── build.gradle.kts            # com.android.library, abiFilters: arm64-v8a/armeabi-v7a/x86_64/x86
 └── src/main/
-    ├── assets/                 # yolo26n_ncnn_model.param/.bin (随 AAR 分发)
     ├── jniLibs/<abi>/libncnn.so
     ├── cpp/
     │   ├── CMakeLists.txt      # 链接官方 libncnn.so
